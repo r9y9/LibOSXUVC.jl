@@ -54,6 +54,10 @@ function set(params::UVCParams)
     ccall((:osxuvc_uvcparams_set, libosxuvc), Void, (Ref{UVCParams},), params)
 end
 
+function Base.dump(params::UVCParams)
+    ccall((:osxuvc_uvcparams_dump, libosxuvc), Void, (Ref{UVCParams},), params)
+end
+
 @deprecate uvcparams_set set
 
 end # module
