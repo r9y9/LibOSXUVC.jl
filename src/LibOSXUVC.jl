@@ -1,6 +1,14 @@
 module LibOSXUVC
 
-export UVCParams, set
+export
+    UVCVideoInterfaceConfigurationParams,
+    UVCCameraControl,
+    UVCControlType,
+    setupByLocationId,
+    setBoolValue,
+    getBoolValue,
+    setNormalizedValue,
+    getNormalizedValue
 
 deps = joinpath(dirname(@__FILE__), "..", "deps", "deps.jl")
 if isfile(deps)
@@ -12,52 +20,93 @@ end
 const version = convert(VersionNumber,
     bytestring(ccall((:osxuvc_version, libosxuvc), Ptr{Cchar}, ())))
 
-type UVCParams
-    locationId::Ptr{Cchar}
-    interfaceIndex::Cint
-    processingUnitId::Cint
-    autoFocus::Bool
-    focusValue::Cfloat
-    autoExposure::Bool
-    exposureValue::Cfloat
-    autoWhitebalance::Bool
-    whitebalanceValue::Cfloat
-    autoFrequency::Bool
-    frequency::Cint
-    gain::Cfloat
-    brightness::Cfloat
-    contrast::Cfloat
-    saturation::Cfloat
-    sharpness::Cfloat
+type UVCVideoInterfaceConfigurationParams
+    interfaceIndex::UInt16
+    processingUnitId::UInt16
+end
 
-    function UVCParams()
-        new(pointer("0x00"), 0x02, 0x02,
-            true, 0.0, # focus
-            true, 0.0, # exposure
-            true, 0.0, # whiteblance
-            true, 50,  # frequency
-            -1,        # gain
-            -1,        # brightness
-            -1,        # contrast
-            -1,        # saturation
-            -1)        # sharpness
+type UVCCameraControl
+    handle::Ptr{Void}
+
+    function UVCCameraControl(params::UVCVideoInterfaceConfigurationParams)
+        handle = ccall((:OSXUVCCreateUVCCameraControl, libosxuvc),
+            Ptr{Void},
+            (Ref{UVCVideoInterfaceConfigurationParams},), params)
+        p = new(handle)
+        finalizer(p, obj -> ccall((:OSXUVCDestroyUVCCameraControl, libosxuvc),
+            Void,
+            (Ptr{Void},), obj.handle))
+        p
     end
 end
 
-function UVCParams(locationId::AbstractString)
-    p = UVCParams()
-    p.locationId = pointer(locationId)
-    p
+# should be in sync with uvc_control_type_t
+module UVCControlType
+
+const AutoExposure = 0
+const AbsoluteExposure = 1
+const AutoFocus = 2
+const AbsoluteFocus = 3
+const AutoWhitebalance = 4
+const AbsoluteWhitebalance = 5
+const Gain = 6
+const Brightness = 7
+const Contrast = 8
+const Saturation = 9
+const Sharpness = 10
+const PowerLineFrequency = 11
+
 end
 
-function set(params::UVCParams)
-    ccall((:osxuvc_uvcparams_set, libosxuvc), Void, (Ref{UVCParams},), params)
+function setupByLocationId(ucc::UVCCameraControl, locationId::AbstractString)
+    intLocatiionId = ccall(
+        (:OSXUVCUVCConvertLocationIdStringToUInt32, libosxuvc),
+        UInt32, (Ptr{Cchar},), pointer(locationId))
+    ccall((:OSXUVCCUVCCameraControlSetupByLocationId, libosxuvc),
+        Bool, (Ptr{Void}, UInt32), ucc.handle, intLocatiionId)
+    ucc
 end
 
-function Base.dump(params::UVCParams)
-    ccall((:osxuvc_uvcparams_dump, libosxuvc), Void, (Ref{UVCParams},), params)
+# convenient constructor
+function UVCCameraControl(params::UVCVideoInterfaceConfigurationParams,
+        locationId::AbstractString)
+    ucc = UVCCameraControl(params)
+    setupByLocationId(ucc, locationId)
+    ucc
 end
 
-@deprecate uvcparams_set set
+### set/get ###
+
+function setBoolValue(ucc::UVCCameraControl, typ, val::Bool)
+    ccall((:OSXUVCCUVCCameraControlSetBoolValue, libosxuvc),
+        Bool, (Ptr{Void}, Cint, Bool), ucc.handle, typ, val)
+end
+
+function getBoolValue(ucc::UVCCameraControl, typ)
+    val = Bool[1]
+    ccall((:OSXUVCCUVCCameraControlGetBoolValue, libosxuvc),
+        Bool, (Ptr{Void}, Cint, Ptr{Bool}), ucc.handle, typ, pointer(val))
+    val[1]
+end
+
+
+function setNormalizedValue(ucc::UVCCameraControl, typ, val)
+    ccall((:OSXUVCCUVCCameraControlSetNormalizedValue, libosxuvc),
+        Bool, (Ptr{Void}, Cint, Cfloat), ucc.handle, typ, val)
+end
+
+function getNormalizedValue(ucc::UVCCameraControl, typ)
+    val = Cfloat[1]
+    ccall((:OSXUVCCUVCCameraControlGetNormalizedValue, libosxuvc),
+        Bool, (Ptr{Void}, Cint, Ptr{Cfloat}), ucc.handle, typ, pointer(val))
+    val[1]
+end
+
+### utils ###
+
+function Base.dump(ucc::UVCCameraControl)
+    ccall((:OSXUVCUVCCameraControlDumpConfiguration, libosxuvc),
+        Void, (Ptr{Void},), ucc.handle)
+end
 
 end # module
