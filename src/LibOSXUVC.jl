@@ -1,6 +1,6 @@
 module LibOSXUVC
 
-export UVCParams, uvcparams_set
+export UVCParams, set
 
 deps = joinpath(dirname(@__FILE__), "..", "deps", "deps.jl")
 if isfile(deps)
@@ -24,18 +24,36 @@ type UVCParams
     whitebalanceValue::Cfloat
     autoFrequency::Bool
     frequency::Cint
+    gain::Cfloat
+    brightness::Cfloat
+    contrast::Cfloat
+    saturation::Cfloat
+    sharpness::Cfloat
 
     function UVCParams()
         new(pointer("0x00"), 0x02, 0x02,
             true, 0.0, # focus
             true, 0.0, # exposure
             true, 0.0, # whiteblance
-            true, 50)  # frequency
+            true, 50,  # frequency
+            -1,        # gain
+            -1,        # brightness
+            -1,        # contrast
+            -1,        # saturation
+            -1)        # sharpness
     end
 end
 
-function uvcparams_set(params::UVCParams)
+function UVCParams(locationId::AbstractString)
+    p = UVCParams()
+    p.locationId = pointer(locationId)
+    p
+end
+
+function set(params::UVCParams)
     ccall((:osxuvc_uvcparams_set, libosxuvc), Void, (Ref{UVCParams},), params)
 end
+
+@deprecate uvcparams_set set
 
 end # module
