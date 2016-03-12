@@ -2,6 +2,8 @@ module LibOSXUVC
 
 export
     UVCVideoInterfaceParams,
+    UVCControlInfo,
+    UVCRange,
     UVCCameraControl,
     UVCControlType,
     setupByLocationId,
@@ -23,6 +25,17 @@ const version = convert(VersionNumber,
 type UVCVideoInterfaceParams
     interfaceIndex::UInt16
     processingUnitId::UInt16
+end
+
+immutable UVCControlInfo
+    size::UInt16
+    selector::UInt16
+    unit::UInt16
+end
+
+immutable UVCRange
+    min::Cint
+    max::Cint
 end
 
 type UVCCameraControl
@@ -96,6 +109,18 @@ function getNormalizedValue(ucc::UVCCameraControl, typ)
     ccall((:OSXUVCUVCCameraControlGetNormalizedValue, libOSXUVC),
         Bool, (Ptr{Void}, Cint, Ptr{Cfloat}), ucc.handle, typ, pointer(val))
     val[1]
+end
+
+# low-level interface
+
+function getControlInfo(ucc::UVCCameraControl, typ)
+    ccall((:OSXUVCUVCCameraControlGetControlInfo, libOSXUVC),
+        UVCControlInfo, (Ptr{Void}, Cint), ucc.handle, typ)
+end
+
+function getRangeForControl(ucc::UVCCameraControl, control::UVCControlInfo)
+    ccall((:OSXUVCUVCCameraControlGetRangeForControl, libOSXUVC),
+        UVCRange, (Ptr{Void}, Ref{UVCControlInfo}), ucc.handle, control)
 end
 
 ### utils ###
