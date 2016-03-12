@@ -3,7 +3,7 @@ using Compat
 
 @BinDeps.setup
 
-const libosxuvc_version = "master"
+const libOSXUVC_version = "master"
 
 ignore_paths = split(strip(get(ENV, "LIBOSXUVCJL_LIBRARY_IGNORE_PATH", "")), ':')
 
@@ -15,18 +15,18 @@ validate = function(libpath, handle)
     return true
 end
 
-libosxuvc = library_dependency("libosxuvc", validate=validate)
+libOSXUVC = library_dependency("libOSXUVC", validate=validate)
 
 # Yes, this is closed for now
-github_root = "http://github.team-lab.local/ryuyamamoto/libosxuvc"
+github_root = "http://github.team-lab.local/ryuyamamoto/libOSXUVC"
 
 provides(Sources,
-         URI("$(github_root)/archive/$(libosxuvc_version).tar.gz"),
-         libosxuvc,
-         unpacked_dir="libosxuvc-$(libosxuvc_version)")
+         URI("$(github_root)/archive/$(libOSXUVC_version).tar.gz"),
+         libOSXUVC,
+         unpacked_dir="libOSXUVC-$(libOSXUVC_version)")
 
-prefix = joinpath(BinDeps.depsdir(libosxuvc), "usr")
-srcdir = joinpath(BinDeps.depsdir(libosxuvc), "src", "libosxuvc-$(libosxuvc_version)")
+prefix = joinpath(BinDeps.depsdir(libOSXUVC), "usr")
+srcdir = joinpath(BinDeps.depsdir(libOSXUVC), "src", "libOSXUVC-$(libOSXUVC_version)")
 
 cmake_options = [
     "-DCMAKE_INSTALL_PREFIX=$prefix",
@@ -35,7 +35,7 @@ cmake_options = [
 
 provides(SimpleBuild,
           (@build_steps begin
-              GetSources(libosxuvc)
+              GetSources(libOSXUVC)
               @build_steps begin
                   ChangeDirectory(srcdir)
                   `mkdir -p build`
@@ -47,6 +47,6 @@ provides(SimpleBuild,
                       `make install`
                   end
                 end
-          end), libosxuvc, os = :Unix)
+          end), libOSXUVC, os = :Unix)
 
-@BinDeps.install @compat Dict(:libosxuvc => :libosxuvc)
+@BinDeps.install @compat Dict(:libOSXUVC => :libOSXUVC)
