@@ -10,7 +10,9 @@ export
     setBoolValue,
     getBoolValue,
     setNormalizedValue,
-    getNormalizedValue
+    getNormalizedValue,
+    getControlInfo,
+    getRangeForControl
 
 deps = joinpath(dirname(@__FILE__), "..", "deps", "deps.jl")
 if isfile(deps)
@@ -22,18 +24,30 @@ end
 const version = convert(VersionNumber,
     bytestring(ccall((:OSXUVCVersion, libOSXUVC), Ptr{Cchar}, ())))
 
+macro uvccall(f, rettype, argtypes, args...)
+    args = map(esc, args)
+    quote
+        r = ccall(($f, LibOSXUVC.libOSXUVC),
+              $rettype, $argtypes, $(args...))
+        if r != Void && r != 0
+            error("[OSXUVC]: failed in $($f), code: $r")
+        end
+        r
+    end
+end
+
 type UVCVideoInterfaceParams
     interfaceIndex::UInt16
     processingUnitId::UInt16
 end
 
-immutable UVCControlInfo
+type UVCControlInfo
     size::UInt16
     selector::UInt16
     unit::UInt16
 end
 
-immutable UVCRange
+type UVCRange
     min::Cint
     max::Cint
 end
@@ -71,8 +85,8 @@ function setupByLocationId(ucc::UVCCameraControl, locationId::AbstractString)
     intLocatiionId = ccall(
         (:OSXUVCConvertLocationIdStringToUInt32, libOSXUVC),
         UInt32, (Ptr{Cchar},), pointer(locationId))
-    ccall((:OSXUVCUVCCameraControlSetupByLocationId, libOSXUVC),
-        Bool, (Ptr{Void}, UInt32), ucc.handle, intLocatiionId)
+    @uvccall(:OSXUVCUVCCameraControlSetupByLocationId,
+        Cint, (Ptr{Void}, UInt32), ucc.handle, intLocatiionId)
     ucc
 end
 
@@ -86,41 +100,47 @@ end
 
 ### set/get ###
 
-function setBoolValue(ucc::UVCCameraControl, typ, val::Bool)
-    ccall((:OSXUVCUVCCameraControlSetBoolValue, libOSXUVC),
-        Bool, (Ptr{Void}, Cint, Bool), ucc.handle, typ, val)
+function setBoolValue(ucc::UVCCameraControl, typ, val)
+    @uvccall(:OSXUVCUVCCameraControlSetBoolValue,
+        Cint, (Ptr{Void}, Cint, Cint), ucc.handle, typ, val)
 end
 
 function getBoolValue(ucc::UVCCameraControl, typ)
-    val = Bool[1]
-    ccall((:OSXUVCUVCCameraControlGetBoolValue, libOSXUVC),
-        Bool, (Ptr{Void}, Cint, Ptr{Bool}), ucc.handle, typ, pointer(val))
+    val = Cint[1]
+    @uvccall(:OSXUVCUVCCameraControlGetBoolValue,
+        Cint, (Ptr{Void}, Cint, Ptr{Cint}), ucc.handle, typ, pointer(val))
     val[1]
 end
 
 
 function setNormalizedValue(ucc::UVCCameraControl, typ, val)
-    ccall((:OSXUVCUVCCameraControlSetNormalizedValue, libOSXUVC),
-        Bool, (Ptr{Void}, Cint, Cfloat), ucc.handle, typ, val)
+    @uvccall(:OSXUVCUVCCameraControlSetNormalizedValue,
+        Cint, (Ptr{Void}, Cint, Cfloat), ucc.handle, typ, val)
 end
 
 function getNormalizedValue(ucc::UVCCameraControl, typ)
     val = Cfloat[1]
-    ccall((:OSXUVCUVCCameraControlGetNormalizedValue, libOSXUVC),
-        Bool, (Ptr{Void}, Cint, Ptr{Cfloat}), ucc.handle, typ, pointer(val))
+    @uvccall(:OSXUVCUVCCameraControlGetNormalizedValue,
+        Cint, (Ptr{Void}, Cint, Ptr{Cfloat}), ucc.handle, typ, pointer(val))
     val[1]
 end
 
 # low-level interface
 
 function getControlInfo(ucc::UVCCameraControl, typ)
-    ccall((:OSXUVCUVCCameraControlGetControlInfo, libOSXUVC),
-        UVCControlInfo, (Ptr{Void}, Cint), ucc.handle, typ)
+    info = UVCControlInfo(0,0,0)
+    @uvccall(:OSXUVCUVCCameraControlGetControlInfo,
+        Cint, (Ptr{Void}, Cint, Ptr{UVCControlInfo}),
+        ucc.handle, typ, &info)
+    info
 end
 
 function getRangeForControl(ucc::UVCCameraControl, control::UVCControlInfo)
-    ccall((:OSXUVCUVCCameraControlGetRangeForControl, libOSXUVC),
-        UVCRange, (Ptr{Void}, Ref{UVCControlInfo}), ucc.handle, control)
+    range = UVCRange(0,0)
+    @uvccall(:OSXUVCUVCCameraControlGetRangeForControl,
+        Cint, (Ptr{Void}, Ref{UVCControlInfo}, Ptr{UVCRange}),
+        ucc.handle, control, &range)
+    range
 end
 
 ### utils ###
