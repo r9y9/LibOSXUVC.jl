@@ -1,11 +1,14 @@
 module LibOSXUVC
 
 export
-    UVCVideoInterfaceParams,
     UVCControlInfo,
     UVCRange,
     UVCCameraControl,
     UVCControlType,
+    setInterfaceIndex,
+    getInterfaceIndex,
+    setProcessingUnitId,
+    getProcessingUnitId,
     setupByLocationId,
     setBoolValue,
     getBoolValue,
@@ -36,11 +39,6 @@ macro uvccall(f, rettype, argtypes, args...)
     end
 end
 
-type UVCVideoInterfaceParams
-    interfaceIndex::UInt16
-    processingUnitId::UInt16
-end
-
 type UVCControlInfo
     size::UInt16
     selector::UInt16
@@ -55,10 +53,9 @@ end
 type UVCCameraControl
     handle::Ptr{Void}
 
-    function UVCCameraControl(params::UVCVideoInterfaceParams)
+    function UVCCameraControl()
         handle = ccall((:OSXUVCUVCCameraControlCreate, libOSXUVC),
-            Ptr{Void},
-            (Ref{UVCVideoInterfaceParams},), params)
+            Ptr{Void}, ())
         p = new(handle)
         finalizer(p, obj -> ccall((:OSXUVCUVCCameraControlDestroy, libOSXUVC),
             Void,
@@ -74,7 +71,7 @@ import ..LibOSXUVC: libOSXUVC
 min_control_type = ccall((:UVCGetMinControlType, libOSXUVC), Cint,())
 max_control_type = ccall((:UVCGetMaxControlType, libOSXUVC), Cint,())
 for v in min_control_type:max_control_type
-    name = ccall((:UVCGetControlTypeString, libOSXUVC),
+    name = ccall((:UVCGetControlTypeShortString, libOSXUVC),
             Ptr{Cchar}, (Int32,), v) |> bytestring |> symbol
     @eval const $name = $v
 end
@@ -90,10 +87,35 @@ function setupByLocationId(ucc::UVCCameraControl, locationId::AbstractString)
     ucc
 end
 
+function setInterfaceIndex(ucc::UVCCameraControl, idx)
+    @uvccall(:OSXUVCUVCCameraControlSetInterfaceIndex, Cint,
+        (Ptr{Void}, UInt16), ucc.handle, idx)
+end
+
+function getInterfaceIndex(ucc::UVCCameraControl)
+    idx = UInt16[1]
+    @uvccall(:OSXUVCUVCCameraControlGetInterfaceIndex, Cint,
+        (Ptr{Void}, Ptr{UInt16}), ucc.handle, pointer(idx))
+    idx[1]
+end
+
+function setProcessingUnitId(ucc::UVCCameraControl, id)
+    @uvccall(:OSXUVCUVCCameraControlSetProcessingUnitId, Cint,
+        (Ptr{Void}, UInt16), ucc.handle, id)
+end
+
+function getProcessingUnitId(ucc::UVCCameraControl)
+    id = UInt16[1]
+    @uvccall(:OSXUVCUVCCameraControlGetProcessingUnitId, Cint,
+        (Ptr{Void}, Ptr{UInt16}), ucc.handle, pointer(id))
+    id[1]
+end
+
 # convenient constructor
-function UVCCameraControl(params::UVCVideoInterfaceParams,
-        locationId::AbstractString)
-    ucc = UVCCameraControl(params)
+function UVCCameraControl(idx, id, locationId::AbstractString)
+    ucc = UVCCameraControl()
+    setInterfaceIndex(ucc, idx)
+    setProcessingUnitId(ucc, id)
     setupByLocationId(ucc, locationId)
     ucc
 end
