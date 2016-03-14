@@ -82,8 +82,12 @@ function setupByLocationId(ucc::UVCCameraControl, locationId::AbstractString)
     intLocatiionId = ccall(
         (:OSXUVCConvertLocationIdStringToUInt32, libOSXUVC),
         UInt32, (Ptr{Cchar},), pointer(locationId))
+    setupByLocationId(ucc, intLocatiionId)
+end
+
+function setupByLocationId(ucc::UVCCameraControl, locationId::UInt32)
     @uvccall(:OSXUVCUVCCameraControlSetupByLocationId,
-        Cint, (Ptr{Void}, UInt32), ucc.handle, intLocatiionId)
+        Cint, (Ptr{Void}, UInt32), ucc.handle, locationId)
     ucc
 end
 
@@ -112,7 +116,8 @@ function getProcessingUnitId(ucc::UVCCameraControl)
 end
 
 # convenient constructor
-function UVCCameraControl(idx, id, locationId::AbstractString)
+function UVCCameraControl(idx, id,
+        locationId::Union{UInt32,AbstractString})
     ucc = UVCCameraControl()
     setInterfaceIndex(ucc, idx)
     setProcessingUnitId(ucc, id)
