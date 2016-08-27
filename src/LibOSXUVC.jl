@@ -1,5 +1,7 @@
 module LibOSXUVC
 
+using Compat
+
 export
     UVCControlInfo,
     UVCRange,
@@ -25,7 +27,7 @@ else
 end
 
 const version = convert(VersionNumber,
-    bytestring(ccall((:OSXUVCVersion, libOSXUVC), Ptr{Cchar}, ())))
+    unsafe_string(ccall((:OSXUVCVersion, libOSXUVC), Ptr{Cchar}, ())))
 
 macro uvccall(f, rettype, argtypes, args...)
     args = map(esc, args)
@@ -72,7 +74,7 @@ min_control_type = ccall((:UVCGetMinControlType, libOSXUVC), Cint,())
 max_control_type = ccall((:UVCGetMaxControlType, libOSXUVC), Cint,())
 for v in min_control_type:max_control_type
     name = ccall((:UVCGetControlTypeShortString, libOSXUVC),
-            Ptr{Cchar}, (Int32,), v) |> bytestring |> symbol
+            Ptr{Cchar}, (Int32,), v) |> unsafe_string |> Symbol
     @eval const $name = $v
 end
 
